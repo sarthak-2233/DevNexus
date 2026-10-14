@@ -1,0 +1,346 @@
+Phase 1: Build the backend first
+We'll build your AI website builder step by step, assuming you're starting as a beginner. We won't jump into multi-agent systems, Qdrant, or complicated LangGraph workflows yet. First, we'll build a working backend that accepts a user's request, sends it to Gemini, and returns a website-generation result.
+Yes, keep the frontend and backend in separate folders. Since you're using React and Tailwind for the frontend and Node.js with Express for the backend, this is a clean structure for your project.
+1. Understand the architecture
+Frontend — React + Tailwind CSS
+The interface where users describe the website they want.
+Build later
+
+HTTP request / JSON response
+
+Backend — Node.js + Express
+Receives requests, validates input, calls Gemini, and returns results.
+Build first
+
+
+Gemini API
+Generates the initial website plan and code.
+
+
+The backend will work independently of the frontend. We'll test it using an API testing tool or the terminal before connecting React.
+2. Create your project folders
+Open your terminal in the location where you want to keep the project. Run:
+mkdir webforge-ai
+cd webforge-ai
+
+mkdir backend frontend
+cd backend
+npm init -y
+
+
+Your initial folder structure will look like this:
+webforge-ai/
+
+backend/
+Express API, Gemini integration, business logic, and tests.
+
+
+frontend/
+React, HTML, Tailwind CSS, and the user interface — later.
+
+
+
+
+Why separate them?
+- Each can have its own dependencies and package.json.
+- Your Gemini API key stays on the backend, not in browser code.
+- You can develop and test the API before the UI exists.
+- Later, React can communicate with Express through HTTP requests.
+3. Set up the backend folder structure
+Inside backend, we'll create a simple structure that's easy to understand and can grow later.
+Run these commands from the webforge-ai/backend folder:
+mkdir src
+mkdir src/routes src/controllers src/services src/middleware
+
+
+Create these files using your code editor (VS Code is a good choice):
+backend/
+
+package.json
+
+Dependencies and commands
+
+.env
+
+Secret API key
+
+.env.example
+
+Example configuration
+
+src/
+server.js
+
+Starts the Express server.
+
+routes/
+
+Defines API URLs.
+controllers/
+
+Handles incoming requests.
+services/
+
+Contains Gemini integration and generation logic.
+middleware/
+
+Handles shared request processing and errors later.
+
+
+
+
+
+4. Install the backend dependencies
+In your terminal, make sure you're inside webforge-ai/backend, then run:
+npm install express cors dotenv @google/genai
+npm install --save-dev nodemon
+
+
+What these packages do:
+Package	Purpose
+express	Creates your backend API
+cors	Allows your future React app to call the API
+dotenv	Loads environment variables from .env
+@google/genai	Connects your backend to Gemini
+nodemon	Automatically restarts the server when files change
+Now open package.json. Keep the dependencies that npm installed and update the scripts section and add "type": "module" so it looks like this overall:
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  }
+}
+
+
+Important: Don't replace the entire package.json with that snippet if it would remove your dependencies and devDependencies. Add "type": "module" and update only "scripts" in the existing file.
+5. Create your environment variables
+Create a file named .env in the backend folder:
+PORT=5000
+GEMINI_API_KEY=put_your_real_gemini_api_key_here
+
+
+Get your API key from Google AI Studio and replace the placeholder.
+Also create .env.example:
+PORT=5000
+GEMINI_API_KEY=
+
+
+Create a .gitignore file in backend:
+node_modules/
+.env
+
+
+Security rule: Never put your Gemini key in React code, commit it to Git, or share it in screenshots. The backend uses it privately.
+6. Build your first Express server
+Open backend/src/server.js and add:
+
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+
+import websiteRoutes from "./routes/websiteRoutes.js";
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: "1mb" }));
+
+// Basic API test
+app.get("/api/health", (req, res) => {
+  res.json({
+    success: true,
+    message: "WebForge AI backend is running!",
+  });
+});
+
+// Website generation routes
+app.use("/api/websites", websiteRoutes);
+
+// Handle unknown routes
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found",
+  });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Backend running at http://localhost:${PORT}`);
+});
+
+
+
+Don't worry about every line right now:
+- express() creates your application.
+- express.json() lets the server read JSON request bodies.
+- /api/health gives us a simple way to test the server.
+- /api/websites will contain the website-generation endpoint.
+7. Build the website-generation API
+We'll use a simple request flow:
+#chatgpt-mermaid-_r_mi_{font-family:-apple-system-body,ui-sans-serif,-apple-system,system-ui,"Segoe UI",Helvetica,"Apple Color Emoji",Arial,sans-serif,"Segoe UI Emoji","Segoe UI Symbol";font-size:16px;fill:rgb(13, 13, 13);}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#chatgpt-mermaid-_r_mi_ .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#chatgpt-mermaid-_r_mi_ .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#chatgpt-mermaid-_r_mi_ .error-icon{fill:rgb(243, 243, 243);}#chatgpt-mermaid-_r_mi_ .error-text{fill:rgb(13, 13, 13);stroke:rgb(13, 13, 13);}#chatgpt-mermaid-_r_mi_ .edge-thickness-normal{stroke-width:1px;}#chatgpt-mermaid-_r_mi_ .edge-thickness-thick{stroke-width:3.5px;}#chatgpt-mermaid-_r_mi_ .edge-pattern-solid{stroke-dasharray:0;}#chatgpt-mermaid-_r_mi_ .edge-thickness-invisible{stroke-width:0;fill:none;}#chatgpt-mermaid-_r_mi_ .edge-pattern-dashed{stroke-dasharray:3;}#chatgpt-mermaid-_r_mi_ .edge-pattern-dotted{stroke-dasharray:2;}#chatgpt-mermaid-_r_mi_ .marker{fill:rgb(143, 143, 143);stroke:rgb(143, 143, 143);}#chatgpt-mermaid-_r_mi_ .marker.cross{stroke:rgb(143, 143, 143);}#chatgpt-mermaid-_r_mi_ svg{font-family:-apple-system-body,ui-sans-serif,-apple-system,system-ui,"Segoe UI",Helvetica,"Apple Color Emoji",Arial,sans-serif,"Segoe UI Emoji","Segoe UI Symbol";font-size:16px;}#chatgpt-mermaid-_r_mi_ p{margin:0;}#chatgpt-mermaid-_r_mi_ .label{font-family:-apple-system-body,ui-sans-serif,-apple-system,system-ui,"Segoe UI",Helvetica,"Apple Color Emoji",Arial,sans-serif,"Segoe UI Emoji","Segoe UI Symbol";color:rgb(13, 13, 13);}#chatgpt-mermaid-_r_mi_ .cluster-label text{fill:rgb(13, 13, 13);}#chatgpt-mermaid-_r_mi_ .cluster-label span{color:rgb(13, 13, 13);}#chatgpt-mermaid-_r_mi_ .cluster-label span p{background-color:transparent;}#chatgpt-mermaid-_r_mi_ .label text,#chatgpt-mermaid-_r_mi_ span{fill:rgb(13, 13, 13);color:rgb(13, 13, 13);}#chatgpt-mermaid-_r_mi_ .node rect,#chatgpt-mermaid-_r_mi_ .node circle,#chatgpt-mermaid-_r_mi_ .node ellipse,#chatgpt-mermaid-_r_mi_ .node polygon,#chatgpt-mermaid-_r_mi_ .node path{fill:rgb(222, 234, 251);stroke:rgb(83, 154, 248);stroke-width:1px;}#chatgpt-mermaid-_r_mi_ .rough-node .label text,#chatgpt-mermaid-_r_mi_ .node .label text,#chatgpt-mermaid-_r_mi_ .image-shape .label,#chatgpt-mermaid-_r_mi_ .icon-shape .label{text-anchor:middle;}#chatgpt-mermaid-_r_mi_ .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#chatgpt-mermaid-_r_mi_ .rough-node .label,#chatgpt-mermaid-_r_mi_ .node .label,#chatgpt-mermaid-_r_mi_ .image-shape .label,#chatgpt-mermaid-_r_mi_ .icon-shape .label{text-align:center;}#chatgpt-mermaid-_r_mi_ .node.clickable{cursor:pointer;}#chatgpt-mermaid-_r_mi_ .root .anchor path{fill:rgb(143, 143, 143)!important;stroke-width:0;stroke:rgb(143, 143, 143);}#chatgpt-mermaid-_r_mi_ .arrowheadPath{fill:rgb(143, 143, 143);}#chatgpt-mermaid-_r_mi_ .edgePath .path{stroke:rgb(143, 143, 143);stroke-width:1px;}#chatgpt-mermaid-_r_mi_ .flowchart-link{stroke:rgb(143, 143, 143);fill:none;}#chatgpt-mermaid-_r_mi_ .edgeLabel{background-color:rgb(252, 252, 252);text-align:center;}#chatgpt-mermaid-_r_mi_ .edgeLabel p{background-color:rgb(252, 252, 252);}#chatgpt-mermaid-_r_mi_ .edgeLabel rect{opacity:0.5;background-color:rgb(252, 252, 252);fill:rgb(252, 252, 252);}#chatgpt-mermaid-_r_mi_ .labelBkg{background-color:rgba(252, 252, 252, 0.5);}#chatgpt-mermaid-_r_mi_ .cluster rect{fill:rgb(243, 243, 243);stroke:rgba(0, 0, 0, 0.1);stroke-width:1px;}#chatgpt-mermaid-_r_mi_ .cluster text{fill:rgb(13, 13, 13);}#chatgpt-mermaid-_r_mi_ .cluster span{color:rgb(13, 13, 13);}#chatgpt-mermaid-_r_mi_ div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:-apple-system-body,ui-sans-serif,-apple-system,system-ui,"Segoe UI",Helvetica,"Apple Color Emoji",Arial,sans-serif,"Segoe UI Emoji","Segoe UI Symbol";font-size:12px;background:rgb(243, 243, 243);border:1px solid rgba(0, 0, 0, 0.1);border-radius:2px;pointer-events:none;z-index:100;}#chatgpt-mermaid-_r_mi_ .flowchartTitleText{text-anchor:middle;font-size:18px;fill:rgb(13, 13, 13);}#chatgpt-mermaid-_r_mi_ rect.text{fill:none;stroke-width:0;}#chatgpt-mermaid-_r_mi_ .icon-shape,#chatgpt-mermaid-_r_mi_ .image-shape{background-color:rgb(252, 252, 252);text-align:center;}#chatgpt-mermaid-_r_mi_ .icon-shape p,#chatgpt-mermaid-_r_mi_ .image-shape p{background-color:rgb(252, 252, 252);padding:2px;}#chatgpt-mermaid-_r_mi_ .icon-shape .label rect,#chatgpt-mermaid-_r_mi_ .image-shape .label rect{opacity:0.5;background-color:rgb(252, 252, 252);fill:rgb(252, 252, 252);}#chatgpt-mermaid-_r_mi_ .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#chatgpt-mermaid-_r_mi_ .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#chatgpt-mermaid-_r_mi_ .node .neo-node{stroke:rgb(83, 154, 248);}#chatgpt-mermaid-_r_mi_ [data-look="neo"].node rect,#chatgpt-mermaid-_r_mi_ [data-look="neo"].cluster rect,#chatgpt-mermaid-_r_mi_ [data-look="neo"].node polygon{stroke:url(#chatgpt-mermaid-_r_mi_-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#chatgpt-mermaid-_r_mi_ [data-look="neo"].swimlane.cluster rect{filter:none;}#chatgpt-mermaid-_r_mi_ [data-look="neo"].node path{stroke:url(#chatgpt-mermaid-_r_mi_-gradient);stroke-width:1px;}#chatgpt-mermaid-_r_mi_ [data-look="neo"].node .outer-path{filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#chatgpt-mermaid-_r_mi_ [data-look="neo"].node .neo-line path{stroke:rgb(83, 154, 248);filter:none;}#chatgpt-mermaid-_r_mi_ [data-look="neo"].node circle{stroke:url(#chatgpt-mermaid-_r_mi_-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#chatgpt-mermaid-_r_mi_ [data-look="neo"].node circle .state-start{fill:#000000;}#chatgpt-mermaid-_r_mi_ [data-look="neo"].icon-shape .icon{fill:url(#chatgpt-mermaid-_r_mi_-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#chatgpt-mermaid-_r_mi_ [data-look="neo"].icon-shape .icon-neo path{stroke:url(#chatgpt-mermaid-_r_mi_-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#chatgpt-mermaid-_r_mi_ .node text{font-size:14px;font-weight:600;letter-spacing:normal;fill:rgb(0, 79, 153);}#chatgpt-mermaid-_r_mi_ .edgeLabels text{font-size:13px;font-weight:600;letter-spacing:-0.08px;fill:rgb(0, 79, 153);}#chatgpt-mermaid-_r_mi_ .node tspan[font-weight="normal"],#chatgpt-mermaid-_r_mi_ .edgeLabels tspan[font-weight="normal"]{font-weight:600;}#chatgpt-mermaid-_r_mi_ .edgeLabel .label rect{opacity:1;rx:13px;ry:13px;fill:rgb(245, 250, 255);stroke:rgb(206, 219, 229);stroke-width:1px;}#chatgpt-mermaid-_r_mi_ .node rect,#chatgpt-mermaid-_r_mi_ .node circle,#chatgpt-mermaid-_r_mi_ .node ellipse,#chatgpt-mermaid-_r_mi_ .node polygon,#chatgpt-mermaid-_r_mi_ .node path{fill:rgb(229, 243, 255);stroke:rgba(0, 0, 0, 0.1);stroke-width:1px;}#chatgpt-mermaid-_r_mi_ .node rect{rx:16px;ry:16px;}#chatgpt-mermaid-_r_mi_ .node.mermaid-decision .label-container{fill:rgb(245, 250, 255);stroke:rgb(206, 219, 229);stroke-dasharray:2,2;}#chatgpt-mermaid-_r_mi_ .edgePaths .flowchart-link{stroke:rgb(143, 143, 143);stroke-width:1px;stroke-linecap:round;stroke-linejoin:round;}#chatgpt-mermaid-_r_mi_ .marker{fill:rgb(143, 143, 143);stroke:rgb(143, 143, 143);}#chatgpt-mermaid-_r_mi_ :root{--mermaid-font-family:-apple-system-body,ui-sans-serif,-apple-system,system-ui,"Segoe UI",Helvetica,"Apple Color Emoji",Arial,sans-serif,"Segoe UI Emoji","Segoe UI Symbol";}User submits website ideaExpress routeController validates inputGemini serviceGemini APIReturn generated result
+
+
+
+
+
+Create src/routes/websiteRoutes.js:
+
+import { Router } from "express";
+import { generateWebsite } from "../controllers/websiteController.js";
+
+const router = Router();
+
+router.post("/generate", generateWebsite);
+
+export default router;
+
+
+
+Create src/controllers/websiteController.js:
+
+import { generateWebsiteContent } from "../services/geminiService.js";
+
+export async function generateWebsite(req, res) {
+  try {
+    const { prompt } = req.body;
+
+    if (typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a website description.",
+      });
+    }
+
+    if (prompt.length > 5000) {
+      return res.status(400).json({
+        success: false,
+        message: "The description must be 5000 characters or fewer.",
+      });
+    }
+
+    const result = await generateWebsiteContent(prompt.trim());
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error("Website generation failed:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Website generation failed. Please try again.",
+    });
+  }
+}
+
+
+
+Create src/services/geminiService.js:
+
+import { GoogleGenAI } from "@google/genai";
+
+const apiKey = process.env.GEMINI_API_KEY;
+
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+
+export async function generateWebsiteContent(prompt) {
+  if (!ai) {
+    throw new Error("GEMINI_API_KEY is not configured.");
+  }
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: `
+You are an expert website planner.
+
+Analyze the user's website idea and return a clear website plan.
+Include:
+1. Website purpose
+2. Target audience
+3. Recommended pages
+4. Features
+5. Suggested visual style
+6. A suggested layout for the homepage
+
+Do not claim that you have created or deployed a website.
+For this first version, return a plan only.
+
+User's idea:
+${prompt}
+`,
+  });
+
+  return {
+    websitePlan: response.text,
+  };
+}
+
+
+
+This first endpoint returns a website plan, not finished website files. That's intentional: we'll first verify that our API and Gemini integration work before teaching the backend to generate actual files.
+8. Start your backend
+In the terminal, from the backend directory, run:
+npm run dev
+
+
+You should see a message similar to:
+Backend running at http://localhost:5000
+
+
+Open this URL in your browser:
+Test the backend health endpointYou should receive:
+{
+  "success": true,
+  "message": "WebForge AI backend is running!"
+}
+
+
+9. Test website generation
+You can use Postman or another API client. Create a request with these settings:
+POST
+http://localhost:5000/api/websites/generate
+
+
+Headers
+Content-Type: application/json
+Body → raw → JSON
+
+{
+  "prompt": "Create a modern portfolio website for a photographer with a gallery, about page, and contact form."
+}
+  
+
+
+Expected response shape
+
+{
+  "success": true,
+  "data": {
+    "websitePlan": "..."
+  }
+}
+  
+
+
+
+The websitePlan text will be generated by Gemini, so the exact response will vary. If you get an API-key or model error, check your .env file, API access, and the model name supported by your Gemini account.
+10. What we've built — and what's next
+[ ] Create separate frontend and backend folders
+[ ] Install Express and Gemini dependencies
+[ ] Start the Express server
+[ ] Create a health-check endpoint
+[ ] Create a website-generation endpoint
+[ ] Test a real Gemini API response
+0 of 6 steps checked off
+
+After this works, our next backend milestone is to have Gemini return a structured website specification, then generate actual project files from it. We'll validate the generated output, store it in a workspace, and add tests before we move on to more advanced agent workflows.
+For now, don't add LangGraph, Qdrant, PostgreSQL, or multiple agents. They're useful later, but they would make your first working backend harder to understand.
