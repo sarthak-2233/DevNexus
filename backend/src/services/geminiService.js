@@ -14,7 +14,18 @@ function getAiClient() {
       throw new Error("GEMINI_API_KEY is not configured.");
     }
 
-    aiClient = new GoogleGenAI({ apiKey });
+    // Initialize the client with built-in retry options for transient errors.
+    aiClient = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        retryOptions: {
+          attempts: 5,       // Retry up to 5 times on failure.
+          initialDelay: 1.0, // Start with a 1-second delay.
+          maxDelay: 60,      // Never wait longer than 60 seconds.
+          expBase: 2,        // Double the delay each time (1s, 2s, 4s, 8s...).
+        },
+      },
+    });
   }
 
   return aiClient;
@@ -24,7 +35,8 @@ export async function generateWebsiteContent(prompt) {
   const ai = getAiClient();
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    // The correct and current model ID for the free tier.
+    model: "gemini-3.5-flash-lite",
 
     contents: `
 You are a website product planner.
@@ -129,7 +141,47 @@ ${prompt}
     throw new Error("Gemini returned invalid JSON.");
   }
 
-  // Check that the result matches our expected structure.
+  // Normalize page slugs before schema validation.
+  // Gemini may occasionally return an empty slug.
+  if (Array.isArray(parsedResult.pages)) {
+    const usedSlugs = new Set();
+
+    parsedResult.pages = parsedResult.pages.map((page, index) => {
+      const suppliedSlug =
+        typeof page?.slug === "string" ? page.slug.trim() : "";
+
+      const title =
+        typeof page?.title === "string" ? page.title.trim() : "";
+
+      const slugSource = suppliedSlug || title;
+
+      const baseSlug =
+        slugSource
+          .toLowerCase()
+          .normalize("NFKD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "") || `page-${index + 1}`;
+
+      // Ensure that each page has a unique URL slug.
+      let slug = baseSlug;
+      let suffix = 2;
+
+      while (usedSlugs.has(slug)) {
+        slug = `${baseSlug}-${suffix}`;
+        suffix++;
+      }
+
+      usedSlugs.add(slug);
+
+      return {
+        ...page,
+        slug,
+      };
+    });
+  }
+
+  // Validate the normalized specification.
   const validation = websiteSchema.safeParse(parsedResult);
 
   if (!validation.success) {

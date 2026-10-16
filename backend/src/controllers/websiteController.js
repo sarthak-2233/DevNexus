@@ -1,7 +1,6 @@
 
-import { generateWebsiteContent } from "../services/geminiService.js";
-import { generateWebsiteFiles } from "../services/websiteCodeService.js";
-import { saveWebsiteFiles } from "../services/workspaceService.js";
+import { runWebsiteWorkflow } from "../services/websiteWorkflow.js";
+
 export async function generateWebsite(req, res) {
   try {
     const { prompt } = req.body ?? {};
@@ -20,14 +19,11 @@ export async function generateWebsite(req, res) {
       });
     }
 
-    // Step 1: Understand what the user wants.
-    const websiteSpec = await generateWebsiteContent(prompt.trim());
+    // Run planning, code generation, and workspace saving through LangGraph.
+    const result = await runWebsiteWorkflow(prompt.trim());
 
-    // Step 2: Generate the actual source files.
-    const files = await generateWebsiteFiles(websiteSpec);
-    // Step 3: Save the generated files to the workspace.
-    const project = await saveWebsiteFiles(files, websiteSpec);
-    
+    const { project, websiteSpec } = result;
+
     return res.status(200).json({
       success: true,
       data: {
