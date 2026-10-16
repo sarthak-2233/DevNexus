@@ -74,11 +74,17 @@ ${JSON.stringify(websiteSpec)}
 
   let parsed;
 
-  try {
-    parsed = JSON.parse(responseText);
-  } catch {
-    throw new Error("Gemini returned invalid JSON for website files.");
-  }
+ try {
+  parsed = JSON.parse(responseText);
+} catch (error) {
+  console.error("Gemini JSON parsing failed:", error.message);
+  console.error(
+    "Gemini response preview:",
+    responseText.slice(0, 1000)
+  );
+
+  throw new Error("Gemini returned invalid JSON for website files.");
+}
 
   const validation = generatedFilesSchema.safeParse(parsed);
 

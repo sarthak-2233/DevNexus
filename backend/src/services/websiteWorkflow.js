@@ -11,6 +11,7 @@ import { generateDesignPlan } from "./designAgentService.js";
 import { generateWebsiteFiles } from "./websiteCodeService.js";
 import { validateWebsiteFiles } from "./websiteValidationService.js";
 import { saveWebsiteFiles } from "./workspaceService.js";
+import { retrieveRelevantKnowledge } from "./knowledgeRetrievalService.js";
 
 const WebsiteWorkflowState = Annotation.Root({
   prompt: Annotation(),
@@ -22,7 +23,26 @@ const WebsiteWorkflowState = Annotation.Root({
 });
 
 async function planningAgent(state) {
-  const websiteSpec = await generateWebsiteContent(state.prompt);
+  let referenceKnowledge = [];
+
+  try {
+    referenceKnowledge = await retrieveRelevantKnowledge(state.prompt);
+
+    console.log(
+      `Knowledge retrieval returned ${referenceKnowledge.length} result(s).`
+    );
+  } catch (error) {
+    console.warn(
+      "Knowledge retrieval failed; continuing without references:",
+      error.message
+    );
+  }
+
+  const websiteSpec = await generateWebsiteContent(
+    state.prompt,
+    referenceKnowledge
+  );
+
   return { websiteSpec };
 }
 

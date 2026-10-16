@@ -243,14 +243,72 @@ export async function saveWebsiteFiles(files, websiteSpec) {
     // 7. Publish only after validation and metadata writing succeed.
   console.log("Production build passed. Publishing project...");
 
-await renameWithRetry(
-  temporaryDirectory,
-  projectDirectory
-);
+ console.log("Production build passed. Publishing project...");
 
-published = true;
+    try {
+      // Fast path: rename the temporary project into place.
+      await renameWithRetry(
+        temporaryDirectory,
+        projectDirectory
+      );
+    } catch (renameError) {
+      // Fallback for persistent Windows rename failures.
+      console.warn(
+        "Project rename failed; trying copy-based publishing:",
+        renameError.code || renameError.message
+      );
 
-console.log("Project published successfully:", projectId);
+      try {
+        await copyTemplate(
+          temporaryDirectory,
+          projectDirectory
+        );
+      } catch (copyError) {
+        // Do not leave a partial published project behind.
+        try {
+          await rm(projectDirectory, {
+            recursive: true,
+            force: true,
+            maxRetries: 5,
+            retryDelay: 1000,
+          });
+        } catch (cleanupError) {
+          console.error(
+            "Partial project cleanup failed:",
+            cleanupError.message
+          );
+        }
+
+        throw new Error(
+          `Project publishing failed. Rename: ${renameError.message}. Copy: ${copyError.message}`
+        );
+      }
+
+      // Copy succeeded, so the final project is now published.
+      console.warn(
+        "Project published using the copy-based fallback."
+      );
+
+      // Clean up the temporary copy; a cleanup issue should not
+      // invalidate the already published project.
+      try {
+        await rm(temporaryDirectory, {
+          recursive: true,
+          force: true,
+          maxRetries: 5,
+          retryDelay: 1000,
+        });
+      } catch (cleanupError) {
+        console.warn(
+          "Temporary project cleanup will need attention:",
+          cleanupError.message
+        );
+      }
+    }
+
+    published = true;
+
+    console.log("Project published successfully:", projectId);
     return {
       projectId,
       projectPath: projectDirectory,
