@@ -6,6 +6,9 @@ import PromptBox from "./components/PromptBox";
 import ChatMessage from "./components/ChatMessage";
 import useBuildSession from "./hooks/useBuildSession";
 
+console.log("[WebForge] BuilderPage file loaded");
+
+
 export default function BuilderPage() {
   const [draft, setDraft] = useState("");
   const [sidebar, setSidebar] = useState(false);
@@ -16,7 +19,12 @@ export default function BuilderPage() {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages]);
 
   const submit = () => {
+     console.log("[WebForge] Generate clicked");
+  console.log("[WebForge] Draft:", draft);
+  console.log("[WebForge] Busy:", busy);
+
     if (!draft.trim() || busy) return;
+      console.log("[WebForge] Calling send()");
     send(draft);
     setDraft("");
   };
