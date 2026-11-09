@@ -3,6 +3,8 @@ import { Button, LogoMark } from "@/components";
 import { site } from "@/config/site";
 import AgentSteps from "./AgentSteps";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 export default function ChatMessage({ message }) {
   if (message.role === "user") {
     return (
@@ -24,7 +26,17 @@ export default function ChatMessage({ message }) {
           <p className="mb-4 text-[.95rem] text-muted">{message.result.pages} pages generated, reviewed and packaged.</p>
           <div className="flex flex-wrap gap-2.5">
             <Button size="sm">Preview site</Button>
-            <Button size="sm" variant="ghost">Download code</Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const projectId = message.result?.projectId;
+                if (!projectId) return;
+                window.location.href = `${API_URL}/api/websites/${projectId}/download`;
+              }}
+            >
+              Download code
+            </Button>
           </div>
         </motion.div>
       )}
